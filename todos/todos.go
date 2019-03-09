@@ -11,11 +11,12 @@ import (
 
 // Todo represents a single task
 type Todo struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	DueDate  string    `json:"due_date"`
-	DueClock string    `json:"due_clock"`
-	DueTime  time.Time `json:"due_time"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	DueDate    string    `json:"due_date"`
+	DueClock   string    `json:"due_clock"`
+	DueTime    time.Time `json:"due_time"`
+	NotifiedAt time.Time `json:"notified_at"`
 }
 
 // Manager manages todos
@@ -24,6 +25,7 @@ type Manager interface {
 	Read() ([]Todo, error)
 	Update(t Todo) error
 	Delete(t Todo) error
+	Run(notifications chan<- Todo) error
 }
 
 // Manager manages todos
@@ -111,5 +113,37 @@ func (m *manager) Delete(t Todo) error {
 		newTodos = append(newTodos, todo)
 	}
 	m.todos = newTodos
+	return nil
+}
+
+func (m *manager) Run(notifications chan<- Todo) error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			m.checkTodos(notifications)
+		}
+	}
+}
+
+func (m *manager) checkTodos(notifications chan<- Todo) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	currentTime := time.Now()
+	todoUpdated := false
+	newTodos := []Todo{}
+	for _, todo := range m.todos {
+		if todo.DueTime.Before(currentTime) &&
+			currentTime.Sub(todo.NotifiedAt) > time.Duration(24)*time.Hour {
+			notifications <- todo
+			todo.NotifiedAt = currentTime
+			todoUpdated = true
+		}
+		newTodos = append(newTodos, todo)
+	}
+	if todoUpdated {
+		m.todos = newTodos
+	}
 	return nil
 }

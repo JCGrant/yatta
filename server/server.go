@@ -13,17 +13,19 @@ import (
 
 // Server serves
 type Server struct {
-	port        int
-	todoManager todos.Manager
-	notifiers   []notifiers.Notifier
+	port          int
+	todoManager   todos.Manager
+	notifications chan todos.Todo
+	notifiers     []notifiers.Notifier
 }
 
 // New creates a Server
 func New(port int, todoManager todos.Manager, notifiers ...notifiers.Notifier) *Server {
 	return &Server{
-		port:        port,
-		todoManager: todoManager,
-		notifiers:   notifiers,
+		port:          port,
+		todoManager:   todoManager,
+		notifications: make(chan todos.Todo, 1),
+		notifiers:     notifiers,
 	}
 }
 
@@ -31,6 +33,8 @@ func New(port int, todoManager todos.Manager, notifiers ...notifiers.Notifier) *
 func (s *Server) Start() error {
 	http.HandleFunc("/todo", s.handleTodos)
 	log.Println(fmt.Sprintf("running on http://127.0.0.1:%d", s.port))
+	go s.todoManager.Run(s.notifications)
+	go s.consumeNotifications(s.notifications)
 	return http.ListenAndServe(fmt.Sprintf(":%d", s.port), nil)
 }
 
@@ -119,4 +123,13 @@ func sendResponse(w http.ResponseWriter, v interface{}) error {
 func sendError(w http.ResponseWriter, v interface{}) {
 	w.WriteHeader(500)
 	fmt.Fprint(w, v)
+}
+
+func (s *Server) consumeNotifications(notifications <-chan todos.Todo) {
+	for {
+		todo := <-notifications
+		for _, n := range s.notifiers {
+			n.Notify(todo.Name)
+		}
+	}
 }
