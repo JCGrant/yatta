@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/JCGrant/yatta/notifiers"
+	"github.com/JCGrant/yatta/server"
+	"github.com/JCGrant/yatta/todos"
 )
 
 func main() {
@@ -14,5 +16,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	notifier.Notify("hello")
+	todoManager := todos.NewManager()
+	s := server.New(8080, todoManager, notifier)
+	log.Fatal(s.Start())
 }
