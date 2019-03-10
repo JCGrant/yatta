@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 )
 
@@ -131,7 +132,12 @@ func (m *manager) Update(t Todo) error {
 	newTodos := []Todo{}
 	for _, todo := range m.todos {
 		if todo.ID == t.ID {
-			todo = t
+			mergo.Merge(&todo, t, mergo.WithOverride)
+			var err error
+			todo, err = setDateTime(todo, time.Now())
+			if err != nil {
+				return err
+			}
 		}
 		newTodos = append(newTodos, todo)
 	}
