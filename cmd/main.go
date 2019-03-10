@@ -2,10 +2,13 @@ package main
 
 import (
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/JCGrant/yatta/notifiers"
 	"github.com/JCGrant/yatta/server"
 	"github.com/JCGrant/yatta/todos"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -20,6 +23,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := server.New(8080, todoManager, notifier)
+	port, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "getting port failed"))
+	}
+	s := server.New(port, todoManager, notifier)
 	log.Fatal(s.Start())
 }
