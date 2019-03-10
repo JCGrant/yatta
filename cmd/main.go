@@ -16,7 +16,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	todoManager := todos.NewManager()
+	todoManager, err := todos.NewManager("./secrets/todos.json")
+	if err != nil {
+		log.Fatal(err)
+	}
 	s := server.New(8080, todoManager, notifier)
 	log.Fatal(s.Start())
 }
