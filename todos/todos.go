@@ -2,24 +2,23 @@ package todos
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 )
 
 // Todo represents a single task
 type Todo struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	DueDate    string    `json:"due_date"`
-	DueClock   string    `json:"due_clock"`
-	DueTime    time.Time `json:"due_time"`
-	NotifiedAt time.Time `json:"notified_at"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	DueDateStr  *string    `json:"due_date"`
+	DueDate     *time.Time `json:"due_date_time"`
+	DueClockStr *string    `json:"due_clock"`
+	DueClock    *time.Time `json:"due_clock_time"`
+	NotifiedAt  time.Time  `json:"notified_at"`
 }
 
 // Manager manages todos
@@ -96,8 +95,11 @@ func newTodo(t Todo) (Todo, error) {
 		return Todo{}, err
 	}
 	t.ID = id
-	t, err = setDateTime(t, time.Now())
-	return t, err
+	t, err = setTime(t)
+	if err != nil {
+		return Todo{}, err
+	}
+	return t, nil
 }
 
 func newID() (string, error) {
@@ -108,16 +110,22 @@ func newID() (string, error) {
 	return id.String(), nil
 }
 
-func setDateTime(t Todo, now time.Time) (Todo, error) {
-	if t.DueDate == "" {
-		t.DueDate = now.Format("2006-01-02")
+func setTime(t Todo) (Todo, error) {
+	if t.DueDateStr != nil {
+		dueDate, err := time.Parse("2006-01-02", *t.DueDateStr)
+		if err != nil {
+			return Todo{}, err
+		}
+		t.DueDate = &dueDate
 	}
-	if t.DueClock == "" {
-		t.DueClock = "00:00:00"
+	if t.DueClockStr != nil {
+		dueClock, err := time.Parse("15:04:05", *t.DueClockStr)
+		if err != nil {
+			return Todo{}, err
+		}
+		t.DueClock = &dueClock
 	}
-	dueTime, err := time.Parse("2006-01-02_15:04:05", fmt.Sprintf("%s_%s", t.DueDate, t.DueClock))
-	t.DueTime = dueTime
-	return t, err
+	return t, nil
 }
 
 func (m *manager) Read() ([]Todo, error) {
@@ -132,9 +140,9 @@ func (m *manager) Update(t Todo) error {
 	newTodos := []Todo{}
 	for _, todo := range m.todos {
 		if todo.ID == t.ID {
-			mergo.Merge(&todo, t, mergo.WithOverride)
+			todo = t
 			var err error
-			todo, err = setDateTime(todo, time.Now())
+			todo, err = setTime(todo)
 			if err != nil {
 				return err
 			}
@@ -185,7 +193,15 @@ func (m *manager) checkTodos(notifications chan<- Todo) error {
 	todoUpdated := false
 	newTodos := []Todo{}
 	for _, todo := range m.todos {
-		if todo.DueTime.Before(currentTime) &&
+		if todo.DueDate == nil {
+			newTodos = append(newTodos, todo)
+			continue
+		}
+		dueTime := *todo.DueDate
+		if todo.DueClock != nil {
+			dueTime.Add((*todo.DueClock).AddDate(1, 0, 0).Sub(time.Time{}))
+		}
+		if dueTime.Before(currentTime) &&
 			currentTime.Sub(todo.NotifiedAt) > time.Duration(24)*time.Hour {
 			notifications <- todo
 			todo.NotifiedAt = currentTime
