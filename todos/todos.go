@@ -14,6 +14,7 @@ import (
 type Todo struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
+	Done        bool       `json:"done"`
 	DueDateStr  *string    `json:"due_date"`
 	DueDate     *time.Time `json:"due_date_time"`
 	DueClockStr *string    `json:"due_clock"`
@@ -201,7 +202,8 @@ func (m *manager) checkTodos(notifications chan<- Todo) error {
 		if todo.DueClock != nil {
 			dueTime.Add((*todo.DueClock).AddDate(1, 0, 0).Sub(time.Time{}))
 		}
-		if dueTime.Before(currentTime) &&
+		if !todo.Done &&
+			dueTime.Before(currentTime) &&
 			currentTime.Sub(todo.NotifiedAt) > time.Duration(24)*time.Hour {
 			notifications <- todo
 			todo.NotifiedAt = currentTime
