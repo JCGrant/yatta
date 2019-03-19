@@ -20,6 +20,7 @@ type Todo struct {
 	DueClockStr *string    `json:"due_clock"`
 	DueClock    *time.Time `json:"due_clock_time"`
 	NotifiedAt  time.Time  `json:"notified_at"`
+	Project     string     `json:"project"`
 }
 
 // Manager manages todos
